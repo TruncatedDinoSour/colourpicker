@@ -5,8 +5,7 @@
 # Requirements
 
 - Python 3.8 and up
-- Python tkinter
-- Python tkinter support
+- Python built with tkinter and readline support
 
 # Installation
 

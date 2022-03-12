@@ -2,12 +2,13 @@
 """A script to generate and show colours"""
 
 import os
+import readline
 import sys
 import tkinter
 import typing
 from threading import Thread
 
-VERSION: str = "0.1"
+VERSION: str = "0.2"
 
 RESET: str = "\033[0m"
 
@@ -63,7 +64,7 @@ class CommandFn:
         escape = get_colour_escape(r, g, b, CONFIG["bg"])
 
         print(
-            f"{escape!r} :: rgb({r}, {g}, {b}) :: {rgb_to_hex((r, g, b))}  --  {escape}AsDf{RESET}"
+            f"{repr(escape)[1:-1]} :: rgb({r}, {g}, {b}) :: {rgb_to_hex((r, g, b))}  --  {escape}AsDf{RESET}"
         )
 
     @classmethod
@@ -190,6 +191,48 @@ def commmands_help() -> None:
 COMMANDS.update({"help": commmands_help})
 
 
+class Completer:
+    """https://stackoverflow.com/a/20625918/17411100"""
+
+    def __init__(self, options):
+        self.options = sorted(options)
+
+    def complete(self, text, state):
+        if state == 0:
+            if not text:
+                self.matches = self.options[:]
+            else:
+                self.matches = [s for s in self.options if s and s.startswith(text)]
+
+        try:
+            return self.matches[state]
+        except IndexError:
+            return None
+
+    def display_matches(self, substitution, matches, longest_match_length):
+        line_buffer = readline.get_line_buffer()
+        columns = os.environ.get("COLUMNS", 80)
+
+        print()
+
+        tpl = "{:<" + str(int(max(map(len, matches)) * 1.2)) + "}"
+
+        buffer = ""
+        for match in matches:
+            match = tpl.format(match[len(substitution) :])
+            if len(buffer + match) > columns:
+                print(buffer)
+                buffer = ""
+            buffer += match
+
+        if buffer:
+            print(buffer)
+
+        print(":: ", end="")
+        print(line_buffer, end="")
+        sys.stdout.flush()
+
+
 def parse_and_run(command: str) -> None:
     """This parses commands ad runs them"""
 
@@ -231,8 +274,15 @@ COMMANDS.update({"load": load_file})
 def main() -> int:
     """Main function"""
 
-    sys.argv.append("")
+    readline.parse_and_bind("tab: complete")
 
+    completer: Completer = Completer(list(COMMANDS.keys()))
+
+    readline.set_completer_delims(" \t\n;")
+    readline.set_completer(completer.complete)
+    readline.set_completion_display_matches_hook(completer.display_matches)
+
+    sys.argv.append("")
     file = sys.argv[1]
 
     if file:
@@ -246,8 +296,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    # NOTE: My linter forces me to use docstrings, sorry for this mess
     assert main.__annotations__.get("return") is int, "main() should return an integer"
+
     try:
         sys.exit(main())
     except (KeyboardInterrupt, EOFError):
